@@ -4,10 +4,18 @@
 .vs/
 *.code-workspace
 
-# Xilinx
+# Vivado
 .Xil/
 *.log
 *.str
 *.jou
 project/
 project*
+
+# Vitis
+vitis/.metadata
+vitis/.*
+vitis/RemoteSystemsTempFiles
+
+# Other
+~*
