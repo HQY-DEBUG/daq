@@ -69,8 +69,8 @@ module sys_ctrl #(
   input   wire  [31:0]                     data_in_16                    ,
 
   // 输出数据
-  output  reg   [31:0]                     data_out_1                    ,
-  output  reg   [31:0]                     data_out_2                    ,
+  output  reg                              data_gen_start                , // 数据生成启动
+  output  reg                              data_sel_start                , // 数据选择启动
   output  reg   [31:0]                     data_out_3                    ,
   output  reg   [31:0]                     data_out_4                    ,
   output  reg   [31:0]                     data_out_5                    ,
@@ -242,8 +242,8 @@ always @(posedge ap_clk or negedge ap_rstn)
         s_axi_awready <= 1'b0;
         s_axi_wready  <= 1'b0;
         s_axi_bvalid  <= 1'b0;
-        data_out_1    <= 32'b0;
-        data_out_2    <= 32'b0;
+        data_gen_start <= 1'b0;
+        data_sel_start <= 1'b0;
         data_out_3    <= 32'b0;
         data_out_4    <= 32'b0;
         data_out_5    <= 32'b0;
@@ -271,8 +271,8 @@ always @(posedge ap_clk or negedge ap_rstn)
             s_axi_awready <= 1'b0; // awready 单拍脉冲，避免 PS 误认为可接受新地址
             s_axi_wready  <= 1'b1; // 接受写数据
             case (awaddr_r)        // 使用锁存的地址
-              WR_ADDR_DATA_1 : data_out_1   <= s_axi_wdata;
-              WR_ADDR_DATA_2 : data_out_2   <= s_axi_wdata;
+              WR_ADDR_DATA_1 : data_gen_start <= s_axi_wdata[0];
+              WR_ADDR_DATA_2 : data_sel_start <= s_axi_wdata[0];
               WR_ADDR_DATA_3 : data_out_3   <= s_axi_wdata;
               WR_ADDR_DATA_4 : data_out_4   <= s_axi_wdata;
               WR_ADDR_DATA_5 : data_out_5   <= s_axi_wdata;
