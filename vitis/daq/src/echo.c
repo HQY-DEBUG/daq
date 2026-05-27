@@ -35,8 +35,9 @@
 #include "xil_printf.h"
 #endif
 
-int transfer_data() {
-	return 0;
+int transfer_data()
+{
+    return 0;
 }
 
 void print_app_header()
@@ -62,8 +63,9 @@ err_t recv_callback(void *arg, struct tcp_pcb *tpcb,
 	/* in this case, we assume that the payload is < TCP_SND_BUF */
 	if (tcp_sndbuf(tpcb) > p->len) {
 		err = tcp_write(tpcb, p->payload, p->len, 1);
-	} else
+	} else {
 		xil_printf("no space in tcp_sndbuf\n\r");
+	}
 
 	/* free the received pbuf */
 	pbuf_free(p);
@@ -87,7 +89,6 @@ err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 
 	return ERR_OK;
 }
-
 
 int start_application()
 {

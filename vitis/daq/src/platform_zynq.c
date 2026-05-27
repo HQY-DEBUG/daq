@@ -90,7 +90,7 @@ timer_callback(XScuTimer * TimerInstance)
 	 */
 	static int odd = 1;
 	DetectEthLinkStatus++;
-	 TcpFastTmrFlag = 1;
+	TcpFastTmrFlag = 1;
 
 	odd = !odd;
 #ifndef USE_SOFTETH_ON_ZYNQ
