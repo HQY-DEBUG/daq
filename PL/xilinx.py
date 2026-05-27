@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 xilinx.py  --  Vivado / Vitis HLS 工程自动化工具
-版本    : v1.2
-日期    : 2026/05/03
+版本    : v1.3
+日期    : 2026/05/27
 
 修改记录:
+    v1.3  2026/05/27  新增 -clear 命令，删除当前目录下 .str/.log/.jou 文件
     v1.2  2026/05/03  新增 -copy -b 组合命令，从 impl_1 拷贝产物并导出 XSA
     v1.1  2026/04/27  新增 -copy 命令，拷贝工程 IP 目录到 source/ip
     v1.0  —           创建文件，集成 Vivado 启动、TCL 执行、bitstream 生成、IP 导出功能
@@ -50,6 +51,9 @@ xilinx.py  --  Vivado / Vitis HLS 工程自动化工具
     py xilinx.py -p -c                    # 根据 bit/ 下的 fsbl、bit、app.elf 创建 BIN 后烧写
     py xilinx.py -p -c -no                # 只创建 BOOT.BIN，不烧写
 
+【清理日志文件】
+    py xilinx.py -clear                   # 删除当前目录下所有 .str/.log/.jou 文件
+
 ------------------------------------------------------------------------
 参数说明
 ------------------------------------------------------------------------
@@ -67,6 +71,7 @@ xilinx.py  --  Vivado / Vitis HLS 工程自动化工具
   -p                 烧写 bit/ 下的 BIN 文件；与 -b 连用时仍表示工程文件路径
   -c                 与 -p 连用，先创建 BIN 文件再烧写
   -no                与 -p -c 连用，只创建 BIN 文件，不烧写
+    -clear             删除当前目录下所有 .str/.log/.jou 文件
 
 ------------------------------------------------------------------------
 配置项（脚本顶部常量，按需修改）
@@ -732,6 +737,49 @@ def program_zynq_flash(create_bin=False, bit_dir=None):
     print("Zynq-7020 QSPI Flash 烧写完成")
 
 
+# v1.3 2026/05/27 新增：清理当前目录下 Vivado 日志/会话文件
+def clear_vivado_temp_files(target_dir='.'):
+    """
+    删除目标目录下所有 .str/.log/.jou 文件（不递归子目录）。
+
+    Args:
+        target_dir: 目标目录，默认为当前目录
+    """
+    target_dir = os.path.abspath(target_dir)
+    if not os.path.exists(target_dir):
+        print(f"错误: 目录不存在: {target_dir}")
+        sys.exit(1)
+
+    suffixes = ('.str', '.log', '.jou')
+    deleted_files = []
+    failed_files = []
+
+    for file_name in os.listdir(target_dir):
+        file_path = os.path.join(target_dir, file_name)
+        if not os.path.isfile(file_path):
+            continue
+        if not file_name.lower().endswith(suffixes):
+            continue
+        try:
+            os.remove(file_path)
+            deleted_files.append(file_path)
+        except OSError as exc:
+            failed_files.append((file_path, str(exc)))
+
+    print(f"清理目录: {target_dir}")
+    print(f"已删除文件数量: {len(deleted_files)}")
+    for deleted_file in deleted_files:
+        print(f"  删除: {deleted_file}")
+
+    if failed_files:
+        print(f"删除失败数量: {len(failed_files)}")
+        for failed_file, reason in failed_files:
+            print(f"  失败: {failed_file} ({reason})")
+        sys.exit(1)
+
+    print("清理完成")
+
+
 def build_bitstream(output_dir=None, project_path=None, cpu_jobs=None):
     """
     打开 Vivado 工程并生成 bitstream
@@ -1072,6 +1120,7 @@ def main():
     py xilinx.py -p                           # 烧写 bit/ 下的 BIN 文件
     py xilinx.py -p -c                        # 创建 BOOT.BIN 后烧写
     py xilinx.py -p -c -no                    # 只创建 BOOT.BIN，不烧写
+    py xilinx.py -clear                       # 删除当前目录下 .str/.log/.jou 文件
         """
     )
     
@@ -1113,6 +1162,10 @@ def main():
     parser.add_argument('-copy',
                        action='store_true',
                        help='拷贝 project/project.srcs/sources_1/ip 到 source/ip')
+    # v1.3 2026/05/27 新增：清理当前目录下 .str/.log/.jou 文件
+    parser.add_argument('-clear',
+                       action='store_true',
+                       help='删除当前目录下所有 .str/.log/.jou 文件')
     parser.add_argument('-bg',
                        action='store_true',
                        help='后台运行 Vivado/脚本（默认）')
@@ -1150,6 +1203,11 @@ def main():
 
     if args.copy:
         copy_ip_from_project()
+        return
+
+    # v1.3 2026/05/27 新增：-clear 独立清理日志文件，不依赖 Vivado
+    if args.clear:
+        clear_vivado_temp_files('.')
         return
 
     # v1.2 2026/05/03 新增：Zynq-7020 烧写操作，不依赖 Vivado GUI
@@ -1190,7 +1248,7 @@ def main():
         build_bitstream(args.o, args.p, args.j)
     
     # 如果没有指定任何操作，正常启动 Vivado GUI
-    if not args.bit and not args.s and not args.ip:
+    if not args.bit and not args.s and not args.ip and not args.clear:
         # 如果是后台模式，直接调用
         if bg_mode:
             cmd = ['cmd', '/c', 'call', vivado_bat, '-mode', 'gui'] + args.vivado_args

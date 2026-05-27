@@ -79,7 +79,7 @@ add_files -fileset $obj [file normalize "$origin_dir/source/constraints"]
 # Set 'constrs_1' fileset properties
 set obj [get_filesets constrs_1]
 set_property -name "target_part" -value "$fpga_part" -objects $obj
-set_property -name "target_ucf" -value "E:/hqy/zdyz/daq/PL/source/constraints/pin.xdc" -objects $obj
+set_property -name "target_ucf" -value "[file normalize "$origin_dir/source/constraints/pin.xdc"]" -objects $obj
 
 # Create 'sim_1' fileset (if not found)
 if {[string equal [get_filesets -quiet sim_1] ""]} {
@@ -123,14 +123,13 @@ proc cr_bd_system { parentCell } {
   if { $bCheckIPs == 1 } {
      set list_check_ips "\ 
   xilinx.com:ip:axi_dma:7.1\
-  xilinx.com:ip:axis_data_fifo:2.0\
   xilinx.com:ip:clk_wiz:6.0\
-  xilinx.com:ip:util_vector_logic:2.0\
+  xilinx.com:ip:axis_data_fifo:2.0\
   xilinx.com:ip:processing_system7:5.5\
+  xilinx.com:ip:util_vector_logic:2.0\
   xilinx.com:ip:proc_sys_reset:5.0\
+  xilinx.com:ip:vio:3.0\
   xilinx.com:ip:xlconcat:2.1\
-  xilinx.com:ip:xlconstant:1.1\
-  xilinx.com:ip:xpm_cdc_gen:1.0\
   "
 
    set list_ips_missing ""
@@ -156,11 +155,10 @@ proc cr_bd_system { parentCell } {
   set bCheckModules 1
   if { $bCheckModules == 1 } {
      set list_check_mods "\ 
-  coll_ctrl\
+  data_gen\
   data_sel\
   demux1_2\
   mux2_1\
-  recv\
   "
 
    set list_mods_missing ""
@@ -218,12 +216,9 @@ proc cr_bd_system { parentCell } {
 
 
   # Create ports
-  set laser_on [ create_bd_port -dir I laser_on ]
   set led0 [ create_bd_port -dir O -from 0 -to 0 led0 ]
-  set led1 [ create_bd_port -dir O led1 ]
+  set led1 [ create_bd_port -dir O -from 0 -to 0 led1 ]
   set pl_rstn [ create_bd_port -dir I -type rst pl_rstn ]
-  set ps_ddr_clear [ create_bd_port -dir I -type intr ps_ddr_clear ]
-  set rxdin [ create_bd_port -dir I rxdin ]
 
   # Create instance: axi_dma_0, and set properties
   set axi_dma_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_dma:7.1 axi_dma_0 ]
@@ -244,18 +239,12 @@ proc cr_bd_system { parentCell } {
    CONFIG.S00_HAS_REGSLICE {3} \
  ] $axi_interconnect_0
 
-  # Create instance: cdc_fifo, and set properties
-  set cdc_fifo [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_data_fifo:2.0 cdc_fifo ]
-  set_property -dict [ list \
-   CONFIG.FIFO_DEPTH {32} \
-   CONFIG.IS_ACLK_ASYNC {1} \
- ] $cdc_fifo
-
   # Create instance: clk_wiz_0, and set properties
   set clk_wiz_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz:6.0 clk_wiz_0 ]
   set_property -dict [ list \
    CONFIG.CLKOUT1_JITTER {143.752} \
    CONFIG.CLKOUT1_REQUESTED_OUT_FREQ {64.000} \
+   CONFIG.CLKOUT1_USED {true} \
    CONFIG.CLKOUT2_JITTER {130.958} \
    CONFIG.CLKOUT2_PHASE_ERROR {98.575} \
    CONFIG.CLKOUT2_USED {true} \
@@ -268,23 +257,20 @@ proc cr_bd_system { parentCell } {
    CONFIG.RESET_TYPE {ACTIVE_LOW} \
  ] $clk_wiz_0
 
-  # Create instance: cmd_data, and set properties
-  set cmd_data [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 cmd_data ]
-  set_property -dict [ list \
-   CONFIG.C_SIZE {1} \
- ] $cmd_data
-
-  # Create instance: coll_ctrl_0, and set properties
-  set block_name coll_ctrl
-  set block_cell_name coll_ctrl_0
-  if { [catch {set coll_ctrl_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+  # Create instance: data_gen_0, and set properties
+  set block_name data_gen
+  set block_cell_name data_gen_0
+  if { [catch {set data_gen_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
      catch {common::send_gid_msg -ssname BD::TCL -id 2095 -severity "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
      return 1
-   } elseif { $coll_ctrl_0 eq "" } {
+   } elseif { $data_gen_0 eq "" } {
      catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
      return 1
    }
-  
+    set_property -dict [ list \
+   CONFIG.DATA_WIDTH {32} \
+ ] $data_gen_0
+
   # Create instance: data_sel_0, and set properties
   set block_name data_sel
   set block_cell_name data_sel_0
@@ -295,7 +281,10 @@ proc cr_bd_system { parentCell } {
      catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
      return 1
    }
-  
+    set_property -dict [ list \
+   CONFIG.DATA_WIDTH {32} \
+ ] $data_sel_0
+
   # Create instance: demux1_2_0, and set properties
   set block_name demux1_2
   set block_cell_name demux1_2_0
@@ -307,7 +296,7 @@ proc cr_bd_system { parentCell } {
      return 1
    }
     set_property -dict [ list \
-   CONFIG.WIDTH {64} \
+   CONFIG.WIDTH {32} \
  ] $demux1_2_0
 
   # Create instance: mux2_1_0, and set properties
@@ -321,7 +310,7 @@ proc cr_bd_system { parentCell } {
      return 1
    }
     set_property -dict [ list \
-   CONFIG.WIDTH {64} \
+   CONFIG.WIDTH {32} \
  ] $mux2_1_0
 
   # Create instance: pang_fifo, and set properties
@@ -330,7 +319,7 @@ proc cr_bd_system { parentCell } {
    CONFIG.FIFO_DEPTH {16384} \
    CONFIG.FIFO_MEMORY_TYPE {auto} \
    CONFIG.HAS_WR_DATA_COUNT {1} \
-   CONFIG.TDATA_NUM_BYTES {8} \
+   CONFIG.TDATA_NUM_BYTES {4} \
  ] $pang_fifo
 
   # Create instance: ping_fifo, and set properties
@@ -339,7 +328,7 @@ proc cr_bd_system { parentCell } {
    CONFIG.FIFO_DEPTH {16384} \
    CONFIG.FIFO_MEMORY_TYPE {auto} \
    CONFIG.HAS_WR_DATA_COUNT {1} \
-   CONFIG.TDATA_NUM_BYTES {8} \
+   CONFIG.TDATA_NUM_BYTES {4} \
  ] $ping_fifo
 
   # Create instance: processing_system7_0, and set properties
@@ -1156,17 +1145,6 @@ gpio[0]#qspi0_ss_b#qspi0_io[0]#qspi0_io[1]#qspi0_io[2]#qspi0_io[3]/HOLD_B#qspi0_
    CONFIG.NUM_MI {2} \
  ] $ps7_0_axi_periph
 
-  # Create instance: recv_0, and set properties
-  set block_name recv
-  set block_cell_name recv_0
-  if { [catch {set recv_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
-     catch {common::send_gid_msg -ssname BD::TCL -id 2095 -severity "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   } elseif { $recv_0 eq "" } {
-     catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   }
-  
   # Create instance: rst_and, and set properties
   set rst_and [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 rst_and ]
   set_property -dict [ list \
@@ -1176,52 +1154,23 @@ gpio[0]#qspi0_ss_b#qspi0_io[0]#qspi0_io[1]#qspi0_io[2]#qspi0_io[3]/HOLD_B#qspi0_
   # Create instance: sys_rstn_100m, and set properties
   set sys_rstn_100m [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 sys_rstn_100m ]
 
-  # Create instance: sys_rstn_64m, and set properties
-  set sys_rstn_64m [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 sys_rstn_64m ]
+  # Create instance: vio_ctrl, and set properties
+  set vio_ctrl [ create_bd_cell -type ip -vlnv xilinx.com:ip:vio:3.0 vio_ctrl ]
+  set_property -dict [ list \
+   CONFIG.C_NUM_PROBE_IN {2} \
+   CONFIG.C_NUM_PROBE_OUT {2} \
+ ] $vio_ctrl
 
   # Create instance: xlconcat_0, and set properties
   set xlconcat_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 xlconcat_0 ]
-
-  # Create instance: xlconcat_1, and set properties
-  set xlconcat_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 xlconcat_1 ]
-
-  # Create instance: xlconcat_2, and set properties
-  set xlconcat_2 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 xlconcat_2 ]
-
-  # Create instance: xlconcat_3, and set properties
-  set xlconcat_3 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 xlconcat_3 ]
-
-  # Create instance: xlconstant_0, and set properties
-  set xlconstant_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_0 ]
   set_property -dict [ list \
-   CONFIG.CONST_VAL {0} \
-   CONFIG.CONST_WIDTH {12} \
- ] $xlconstant_0
-
-  # Create instance: xlconstant_1, and set properties
-  set xlconstant_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_1 ]
-  set_property -dict [ list \
-   CONFIG.CONST_VAL {255} \
-   CONFIG.CONST_WIDTH {8} \
- ] $xlconstant_1
-
-  # Create instance: xlconstant_2, and set properties
-  set xlconstant_2 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_2 ]
-  set_property -dict [ list \
-   CONFIG.CONST_VAL {320000000} \
-   CONFIG.CONST_WIDTH {32} \
- ] $xlconstant_2
-
-  # Create instance: xpm_cdc_gen_0, and set properties
-  set xpm_cdc_gen_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xpm_cdc_gen:1.0 xpm_cdc_gen_0 ]
-  set_property -dict [ list \
-   CONFIG.WIDTH {1} \
- ] $xpm_cdc_gen_0
+   CONFIG.NUM_PORTS {1} \
+ ] $xlconcat_0
 
   # Create interface connections
   connect_bd_intf_net -intf_net axi_dma_0_M_AXI_S2MM [get_bd_intf_pins axi_dma_0/M_AXI_S2MM] [get_bd_intf_pins axi_interconnect_0/S00_AXI]
   connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_pins axi_interconnect_0/M00_AXI] [get_bd_intf_pins processing_system7_0/S_AXI_HP0]
-  connect_bd_intf_net -intf_net cdc_fifo_M_AXIS [get_bd_intf_pins cdc_fifo/M_AXIS] [get_bd_intf_pins data_sel_0/s_axis]
+  connect_bd_intf_net -intf_net data_gen_0_m_axis [get_bd_intf_pins data_gen_0/m_axis] [get_bd_intf_pins data_sel_0/s_axis]
   connect_bd_intf_net -intf_net data_sel_0_m_axis [get_bd_intf_pins data_sel_0/m_axis] [get_bd_intf_pins demux1_2_0/s_axis]
   set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_intf_nets data_sel_0_m_axis]
   connect_bd_intf_net -intf_net demux1_2_0_m0_axis [get_bd_intf_pins demux1_2_0/m0_axis] [get_bd_intf_pins ping_fifo/S_AXIS]
@@ -1236,41 +1185,24 @@ gpio[0]#qspi0_ss_b#qspi0_io[0]#qspi0_io[1]#qspi0_io[2]#qspi0_io[3]/HOLD_B#qspi0_
 
   # Create port connections
   connect_bd_net -net axi_dma_0_s2mm_introut [get_bd_pins axi_dma_0/s2mm_introut] [get_bd_pins xlconcat_0/In0]
-  connect_bd_net -net clk_wiz_0_clk_64m [get_bd_pins cdc_fifo/s_axis_aclk] [get_bd_pins clk_wiz_0/clk_64m] [get_bd_pins coll_ctrl_0/clk] [get_bd_pins recv_0/CLKIN] [get_bd_pins sys_rstn_64m/slowest_sync_clk] [get_bd_pins xpm_cdc_gen_0/src_clk]
-  connect_bd_net -net clk_wiz_0_locked [get_bd_pins clk_wiz_0/locked] [get_bd_pins sys_rstn_100m/dcm_locked] [get_bd_pins sys_rstn_64m/dcm_locked]
-  connect_bd_net -net cmd_data_Res [get_bd_pins cdc_fifo/s_axis_tvalid] [get_bd_pins cmd_data/Res]
-  connect_bd_net -net coll_ctrl_0_start [get_bd_ports led1] [get_bd_pins cmd_data/Op2] [get_bd_pins coll_ctrl_0/start] [get_bd_pins xpm_cdc_gen_0/src_in]
+  connect_bd_net -net clk_wiz_0_locked [get_bd_pins clk_wiz_0/locked] [get_bd_pins sys_rstn_100m/dcm_locked]
   connect_bd_net -net data_sel_0_data_in_sel [get_bd_pins data_sel_0/data_in_sel] [get_bd_pins demux1_2_0/sel]
   set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_nets data_sel_0_data_in_sel]
   connect_bd_net -net data_sel_0_data_out_sel [get_bd_pins data_sel_0/data_out_sel] [get_bd_pins mux2_1_0/sel]
   set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_nets data_sel_0_data_out_sel]
-  connect_bd_net -net laser_on_1 [get_bd_ports laser_on] [get_bd_pins coll_ctrl_0/en]
   connect_bd_net -net pang_fifo_axis_wr_data_count [get_bd_pins data_sel_0/pang_data_num] [get_bd_pins pang_fifo/axis_wr_data_count]
   set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_nets pang_fifo_axis_wr_data_count]
   connect_bd_net -net ping_fifo_axis_wr_data_count [get_bd_pins data_sel_0/ping_data_num] [get_bd_pins ping_fifo/axis_wr_data_count]
   set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_nets ping_fifo_axis_wr_data_count]
   connect_bd_net -net pl_rstn_1 [get_bd_ports pl_rstn] [get_bd_pins rst_and/Op2]
-  connect_bd_net -net processing_system7_0_FCLK_CLK0 [get_bd_pins axi_dma_0/m_axi_s2mm_aclk] [get_bd_pins axi_dma_0/s_axi_lite_aclk] [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/S00_ACLK] [get_bd_pins cdc_fifo/m_axis_aclk] [get_bd_pins clk_wiz_0/clk_100m] [get_bd_pins data_sel_0/clk] [get_bd_pins demux1_2_0/clk] [get_bd_pins mux2_1_0/clk] [get_bd_pins pang_fifo/s_axis_aclk] [get_bd_pins ping_fifo/s_axis_aclk] [get_bd_pins processing_system7_0/M_AXI_GP0_ACLK] [get_bd_pins processing_system7_0/S_AXI_HP0_ACLK] [get_bd_pins ps7_0_axi_periph/ACLK] [get_bd_pins ps7_0_axi_periph/M00_ACLK] [get_bd_pins ps7_0_axi_periph/M01_ACLK] [get_bd_pins ps7_0_axi_periph/S00_ACLK] [get_bd_pins sys_rstn_100m/slowest_sync_clk] [get_bd_pins xpm_cdc_gen_0/dest_clk]
+  connect_bd_net -net processing_system7_0_FCLK_CLK0 [get_bd_pins axi_dma_0/m_axi_s2mm_aclk] [get_bd_pins axi_dma_0/s_axi_lite_aclk] [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/S00_ACLK] [get_bd_pins clk_wiz_0/clk_100m] [get_bd_pins data_gen_0/clk] [get_bd_pins data_sel_0/clk] [get_bd_pins demux1_2_0/clk] [get_bd_pins mux2_1_0/clk] [get_bd_pins pang_fifo/s_axis_aclk] [get_bd_pins ping_fifo/s_axis_aclk] [get_bd_pins processing_system7_0/M_AXI_GP0_ACLK] [get_bd_pins processing_system7_0/S_AXI_HP0_ACLK] [get_bd_pins ps7_0_axi_periph/ACLK] [get_bd_pins ps7_0_axi_periph/M00_ACLK] [get_bd_pins ps7_0_axi_periph/M01_ACLK] [get_bd_pins ps7_0_axi_periph/S00_ACLK] [get_bd_pins sys_rstn_100m/slowest_sync_clk] [get_bd_pins vio_ctrl/clk]
   connect_bd_net -net processing_system7_0_FCLK_CLK1 [get_bd_pins clk_wiz_0/clk_in1] [get_bd_pins processing_system7_0/FCLK_CLK0]
   connect_bd_net -net processing_system7_0_FCLK_RESET0_N [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_pins rst_and/Op1]
-  connect_bd_net -net ps_ddr_clear_1 [get_bd_ports ps_ddr_clear] [get_bd_pins xlconcat_0/In1]
-  connect_bd_net -net recv_0_cmd_x [get_bd_pins recv_0/cmd_x] [get_bd_pins xlconcat_1/In1]
-  connect_bd_net -net recv_0_cmd_y [get_bd_pins recv_0/cmd_y] [get_bd_pins xlconcat_2/In1]
-  connect_bd_net -net recv_0_newcmd [get_bd_pins cmd_data/Op1] [get_bd_pins recv_0/newcmd]
-  connect_bd_net -net rst_ps7_0_100M_peripheral_aresetn [get_bd_pins axi_dma_0/axi_resetn] [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins data_sel_0/rstn] [get_bd_pins demux1_2_0/rst_n] [get_bd_pins mux2_1_0/rst_n] [get_bd_pins pang_fifo/s_axis_aresetn] [get_bd_pins ping_fifo/s_axis_aresetn] [get_bd_pins ps7_0_axi_periph/ARESETN] [get_bd_pins ps7_0_axi_periph/M00_ARESETN] [get_bd_pins ps7_0_axi_periph/M01_ARESETN] [get_bd_pins ps7_0_axi_periph/S00_ARESETN] [get_bd_pins sys_rstn_100m/peripheral_aresetn]
-  connect_bd_net -net rxdin_0_1 [get_bd_ports rxdin] [get_bd_pins recv_0/rxdin]
-  connect_bd_net -net sys_rstn_64m_peripheral_aresetn [get_bd_pins cdc_fifo/s_axis_aresetn] [get_bd_pins coll_ctrl_0/rstn] [get_bd_pins recv_0/RSTIN] [get_bd_pins sys_rstn_64m/peripheral_aresetn]
-  connect_bd_net -net util_vector_logic_0_Res [get_bd_ports led0] [get_bd_pins clk_wiz_0/resetn] [get_bd_pins rst_and/Res] [get_bd_pins sys_rstn_100m/ext_reset_in] [get_bd_pins sys_rstn_64m/ext_reset_in]
+  connect_bd_net -net rst_ps7_0_100M_peripheral_aresetn [get_bd_pins axi_dma_0/axi_resetn] [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins data_gen_0/rstn] [get_bd_pins data_sel_0/rstn] [get_bd_pins demux1_2_0/rst_n] [get_bd_pins mux2_1_0/rst_n] [get_bd_pins pang_fifo/s_axis_aresetn] [get_bd_pins ping_fifo/s_axis_aresetn] [get_bd_pins ps7_0_axi_periph/ARESETN] [get_bd_pins ps7_0_axi_periph/M00_ARESETN] [get_bd_pins ps7_0_axi_periph/M01_ARESETN] [get_bd_pins ps7_0_axi_periph/S00_ARESETN] [get_bd_pins sys_rstn_100m/peripheral_aresetn]
+  connect_bd_net -net util_vector_logic_0_Res [get_bd_ports led0] [get_bd_pins clk_wiz_0/resetn] [get_bd_pins rst_and/Res] [get_bd_pins sys_rstn_100m/ext_reset_in] [get_bd_pins vio_ctrl/probe_in0]
+  connect_bd_net -net vio_0_probe_out0 [get_bd_ports led1] [get_bd_pins data_gen_0/start] [get_bd_pins vio_ctrl/probe_out0]
+  connect_bd_net -net vio_ctrl_probe_out1 [get_bd_pins data_sel_0/start] [get_bd_pins vio_ctrl/probe_out1]
   connect_bd_net -net xlconcat_0_dout [get_bd_pins processing_system7_0/IRQ_F2P] [get_bd_pins xlconcat_0/dout]
-  connect_bd_net -net xlconcat_1_dout [get_bd_pins xlconcat_1/dout] [get_bd_pins xlconcat_3/In0]
-  set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_nets xlconcat_1_dout]
-  connect_bd_net -net xlconcat_2_dout [get_bd_pins xlconcat_2/dout] [get_bd_pins xlconcat_3/In1]
-  set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_nets xlconcat_2_dout]
-  connect_bd_net -net xlconcat_3_dout [get_bd_pins cdc_fifo/s_axis_tdata] [get_bd_pins xlconcat_3/dout]
-  connect_bd_net -net xlconstant_0_dout [get_bd_pins xlconcat_1/In0] [get_bd_pins xlconcat_2/In0] [get_bd_pins xlconstant_0/dout]
-  connect_bd_net -net xlconstant_1_dout [get_bd_pins cdc_fifo/s_axis_tkeep] [get_bd_pins xlconstant_1/dout]
-  connect_bd_net -net xlconstant_2_dout [get_bd_pins coll_ctrl_0/count_max] [get_bd_pins xlconstant_2/dout]
-  connect_bd_net -net xpm_cdc_gen_0_dest_out [get_bd_pins data_sel_0/start] [get_bd_pins xpm_cdc_gen_0/dest_out]
 
   # Create address segments
   assign_bd_address -offset 0x00000000 -range 0x40000000 -target_address_space [get_bd_addr_spaces axi_dma_0/Data_S2MM] [get_bd_addr_segs processing_system7_0/S_AXI_HP0/HP0_DDR_LOWOCM] -force
@@ -1279,98 +1211,69 @@ gpio[0]#qspi0_ss_b#qspi0_io[0]#qspi0_io[1]#qspi0_io[2]#qspi0_io[3]/HOLD_B#qspi0_
   # Perform GUI Layout
   regenerate_bd_layout -layout_string {
    "ActiveEmotionalView":"Default View",
-   "Default View_ScaleFactor":"0.932193",
-   "Default View_TopLeft":"2543,471",
+   "Default View_ScaleFactor":"0.637514",
+   "Default View_TopLeft":"-93,-384",
    "ExpandedHierarchyInLayout":"",
    "guistr":"# # String gsaved with Nlview 7.0r6  2020-01-29 bk=1.5227 VDI=41 GEI=36 GUI=JA:10.0 non-TLS
 #  -string -flagsOSRD
-preplace port ddr -pg 1 -lvl 14 -x 4370 -y 410 -defaultsOSRD
-preplace port fixed_io -pg 1 -lvl 14 -x 4370 -y 430 -defaultsOSRD
-preplace port port-id_led1 -pg 1 -lvl 14 -x 4370 -y 710 -defaultsOSRD
-preplace port port-id_pl_rstn -pg 1 -lvl 0 -x 0 -y 920 -defaultsOSRD
-preplace port port-id_rxdin -pg 1 -lvl 0 -x 0 -y 510 -defaultsOSRD
-preplace port port-id_ps_ddr_clear -pg 1 -lvl 0 -x 0 -y 840 -defaultsOSRD
-preplace port port-id_laser_on -pg 1 -lvl 0 -x 0 -y 820 -defaultsOSRD
-preplace portBus led0 -pg 1 -lvl 14 -x 4370 -y 840 -defaultsOSRD
-preplace inst axi_dma_0 -pg 1 -lvl 11 -x 3370 -y 230 -defaultsOSRD
-preplace inst axi_interconnect_0 -pg 1 -lvl 12 -x 3710 -y 230 -defaultsOSRD
-preplace inst cdc_fifo -pg 1 -lvl 6 -x 1650 -y 300 -defaultsOSRD
-preplace inst clk_wiz_0 -pg 1 -lvl 1 -x 130 -y 740 -defaultsOSRD
-preplace inst cmd_data -pg 1 -lvl 5 -x 1270 -y 510 -defaultsOSRD -resize 260 96
-preplace inst coll_ctrl_0 -pg 1 -lvl 13 -x 4100 -y 710 -defaultsOSRD
-preplace inst demux1_2_0 -pg 1 -lvl 8 -x 2350 -y 320 -defaultsOSRD
-preplace inst mux2_1_0 -pg 1 -lvl 10 -x 3030 -y 210 -defaultsOSRD
-preplace inst pang_fifo -pg 1 -lvl 9 -x 2660 -y 350 -defaultsOSRD
-preplace inst ping_fifo -pg 1 -lvl 9 -x 2660 -y 180 -defaultsOSRD
-preplace inst processing_system7_0 -pg 1 -lvl 13 -x 4100 -y 450 -defaultsOSRD
-preplace inst ps7_0_axi_periph -pg 1 -lvl 10 -x 3030 -y 490 -defaultsOSRD
-preplace inst recv_0 -pg 1 -lvl 3 -x 750 -y 500 -defaultsOSRD
-preplace inst rst_and -pg 1 -lvl 13 -x 4100 -y 910 -defaultsOSRD
-preplace inst sys_rstn_100m -pg 1 -lvl 6 -x 1650 -y 100 -defaultsOSRD
-preplace inst sys_rstn_64m -pg 1 -lvl 2 -x 430 -y 620 -defaultsOSRD -resize 300 156
-preplace inst xlconcat_0 -pg 1 -lvl 12 -x 3710 -y 580 -defaultsOSRD
-preplace inst xpm_cdc_gen_0 -pg 1 -lvl 6 -x 1650 -y 720 -defaultsOSRD
-preplace inst xlconcat_1 -pg 1 -lvl 4 -x 1000 -y 370 -defaultsOSRD
-preplace inst xlconcat_2 -pg 1 -lvl 4 -x 1000 -y 250 -defaultsOSRD -resize 160 96
-preplace inst xlconstant_0 -pg 1 -lvl 3 -x 750 -y 240 -defaultsOSRD
-preplace inst xlconcat_3 -pg 1 -lvl 5 -x 1270 -y 370 -defaultsOSRD -resize 160 96
-preplace inst xlconstant_1 -pg 1 -lvl 5 -x 1270 -y 250 -defaultsOSRD -resize 120 88
-preplace inst data_sel_0 -pg 1 -lvl 7 -x 2010 -y 350 -defaultsOSRD
-preplace inst xlconstant_2 -pg 1 -lvl 12 -x 3710 -y 730 -defaultsOSRD -resize 120 88
-preplace netloc axi_dma_0_s2mm_introut 1 11 1 3540 250n
-preplace netloc clk_wiz_0_clk_64m 1 1 12 250 520 600 360 890J 440 NJ 440 1480 630 NJ 630 NJ 630 NJ 630 2830J 650 NJ 650 NJ 650 3870
-preplace netloc clk_wiz_0_locked 1 1 5 240 140 NJ 140 NJ 140 NJ 140 N
-preplace netloc cmd_data_Res 1 5 1 1460 300n
-preplace netloc coll_ctrl_0_start 1 4 10 1120 580 1460 800 NJ 800 NJ 800 NJ 800 NJ 800 NJ 800 NJ 800 NJ 800 4350
-preplace netloc data_sel_0_data_in_sel 1 7 1 N 350
-preplace netloc data_sel_0_data_out_sel 1 7 3 2190J 440 NJ 440 2850
-preplace netloc laser_on_1 1 0 13 NJ 820 NJ 820 NJ 820 NJ 820 NJ 820 NJ 820 NJ 820 NJ 820 NJ 820 NJ 820 NJ 820 NJ 820 3870J
-preplace netloc pang_fifo_axis_wr_data_count 1 6 4 1850 470 NJ 470 NJ 470 2830
-preplace netloc ping_fifo_axis_wr_data_count 1 6 4 1850 230 NJ 230 2480J 260 2830
-preplace netloc pl_rstn_1 1 0 13 NJ 920 NJ 920 NJ 920 NJ 920 NJ 920 NJ 920 NJ 920 NJ 920 NJ 920 NJ 920 NJ 920 NJ 920 NJ
-preplace netloc processing_system7_0_FCLK_CLK0 1 1 12 NJ 740 NJ 740 NJ 740 NJ 740 1440 420 1840 460 2210 420 2500 430 2860 630 3190 330 3560 450 3870
-preplace netloc processing_system7_0_FCLK_CLK1 1 0 14 20 660 230J 730 NJ 730 NJ 730 NJ 730 1420J 810 NJ 810 NJ 810 NJ 810 NJ 810 NJ 810 NJ 810 NJ 810 4340
-preplace netloc processing_system7_0_FCLK_RESET0_N 1 12 2 3860 830 4330
-preplace netloc ps_ddr_clear_1 1 0 12 20J 830 NJ 830 NJ 830 NJ 830 NJ 830 NJ 830 NJ 830 NJ 830 NJ 830 NJ 830 NJ 830 3550J
-preplace netloc recv_0_cmd_x 1 3 1 900 380n
-preplace netloc recv_0_cmd_y 1 3 1 880 260n
-preplace netloc recv_0_newcmd 1 3 2 NJ 500 N
-preplace netloc rst_ps7_0_100M_peripheral_aresetn 1 6 6 1830 240 2200 410 2490 270 2870 640 3200 340 3550
-preplace netloc rxdin_0_1 1 0 3 NJ 510 NJ 510 610J
-preplace netloc sys_rstn_64m_peripheral_aresetn 1 2 11 620 640 NJ 640 NJ 640 1470 640 1820J 660 NJ 660 NJ 660 NJ 660 NJ 660 NJ 660 3860J
-preplace netloc util_vector_logic_0_Res 1 0 14 30 840 260 720 NJ 720 NJ 720 NJ 720 1430 840 NJ 840 NJ 840 NJ 840 NJ 840 NJ 840 NJ 840 NJ 840 4340
-preplace netloc xlconcat_0_dout 1 12 1 3870 490n
-preplace netloc xlconcat_1_dout 1 4 1 1120 360n
-preplace netloc xlconcat_2_dout 1 4 1 1110 250n
-preplace netloc xlconcat_3_dout 1 5 1 1450 260n
-preplace netloc xlconstant_0_dout 1 3 1 900 240n
-preplace netloc xlconstant_1_dout 1 5 1 1480J 250n
-preplace netloc xpm_cdc_gen_0_dest_out 1 6 1 1830 360n
-preplace netloc xlconstant_2_dout 1 12 1 3860J 720n
-preplace netloc axi_dma_0_M_AXI_S2MM 1 11 1 3540 170n
-preplace netloc axi_interconnect_0_M00_AXI 1 12 1 3870 230n
-preplace netloc cdc_fifo_M_AXIS 1 6 1 N 300
-preplace netloc data_sel_0_m_axis 1 7 1 2190 290n
-preplace netloc demux1_2_0_m0_axis 1 8 1 2470 160n
-preplace netloc demux1_2_0_m1_axis 1 8 1 N 330
-preplace netloc mux2_1_0_m_axis 1 10 1 N 210
-preplace netloc pang_fifo_M_AXIS 1 9 1 N 170
-preplace netloc ping_fifo_M_AXIS 1 9 1 2840 190n
-preplace netloc processing_system7_0_DDR 1 13 1 NJ 410
-preplace netloc processing_system7_0_FIXED_IO 1 13 1 NJ 430
-preplace netloc processing_system7_0_M_AXI_GP0 1 9 5 2880 350 NJ 350 NJ 350 NJ 350 4330
-preplace netloc ps7_0_axi_periph_M00_AXI 1 10 1 3180 190n
-levelinfo -pg 1 0 130 430 750 1000 1270 1650 2010 2350 2660 3030 3370 3710 4100 4370
-pagesize -pg 1 -db -bbox -sgen -140 0 4480 980
+preplace port ddr -pg 1 -lvl 11 -x 3390 -y 300 -defaultsOSRD
+preplace port fixed_io -pg 1 -lvl 11 -x 3390 -y 320 -defaultsOSRD
+preplace port port-id_pl_rstn -pg 1 -lvl 0 -x -10 -y 740 -defaultsOSRD
+preplace portBus led0 -pg 1 -lvl 11 -x 3390 -y 670 -defaultsOSRD
+preplace portBus led1 -pg 1 -lvl 11 -x 3390 -y 570 -defaultsOSRD
+preplace inst axi_dma_0 -pg 1 -lvl 8 -x 2400 -y 410 -defaultsOSRD
+preplace inst axi_interconnect_0 -pg 1 -lvl 9 -x 2740 -y 120 -defaultsOSRD
+preplace inst clk_wiz_0 -pg 1 -lvl 1 -x 130 -y 870 -defaultsOSRD
+preplace inst demux1_2_0 -pg 1 -lvl 5 -x 1380 -y 590 -defaultsOSRD
+preplace inst pang_fifo -pg 1 -lvl 6 -x 1690 -y 620 -defaultsOSRD
+preplace inst ping_fifo -pg 1 -lvl 6 -x 1690 -y 460 -defaultsOSRD
+preplace inst processing_system7_0 -pg 1 -lvl 10 -x 3130 -y 340 -defaultsOSRD
+preplace inst ps7_0_axi_periph -pg 1 -lvl 7 -x 2060 -y 380 -defaultsOSRD
+preplace inst rst_and -pg 1 -lvl 9 -x 2740 -y 730 -defaultsOSRD
+preplace inst sys_rstn_100m -pg 1 -lvl 2 -x 410 -y 850 -defaultsOSRD
+preplace inst xlconcat_0 -pg 1 -lvl 9 -x 2740 -y 380 -defaultsOSRD
+preplace inst data_gen_0 -pg 1 -lvl 3 -x 710 -y 830 -defaultsOSRD
+preplace inst mux2_1_0 -pg 1 -lvl 7 -x 2060 -y 630 -defaultsOSRD
+preplace inst vio_ctrl -pg 1 -lvl 10 -x 3130 -y 580 -defaultsOSRD
+preplace inst data_sel_0 -pg 1 -lvl 4 -x 1020 -y 580 -defaultsOSRD
+preplace netloc axi_dma_0_s2mm_introut 1 8 1 2590 380n
+preplace netloc clk_wiz_0_locked 1 1 1 N 890
+preplace netloc data_sel_0_data_in_sel 1 4 1 1200 580n
+preplace netloc data_sel_0_data_out_sel 1 4 3 1230 710 NJ 710 1890J
+preplace netloc pang_fifo_axis_wr_data_count 1 3 4 860 720 NJ 720 NJ 720 1860
+preplace netloc ping_fifo_axis_wr_data_count 1 3 4 860 370 NJ 370 NJ 370 1860
+preplace netloc pl_rstn_1 1 0 9 10J 730 NJ 730 NJ 730 840J 740 NJ 740 NJ 740 NJ 740 NJ 740 NJ
+preplace netloc processing_system7_0_FCLK_CLK0 1 1 9 240 750 580 690 830 690 1210 490 1530 700 1870 230 2210 230 2590 250 2890
+preplace netloc processing_system7_0_FCLK_CLK1 1 0 11 20 210 NJ 210 NJ 210 NJ 210 NJ 210 NJ 210 NJ 210 NJ 210 2580J 440 NJ 440 3370
+preplace netloc processing_system7_0_FCLK_RESET0_N 1 8 3 2580 450 NJ 450 3360
+preplace netloc rst_ps7_0_100M_peripheral_aresetn 1 2 7 590 700 840 700 1240 680 1500 380 1900 220 2220 180 2580
+preplace netloc util_vector_logic_0_Res 1 0 11 30 790 230 740 NJ 740 830J 800 NJ 800 NJ 800 NJ 800 NJ 800 NJ 800 2890 670 NJ
+preplace netloc xlconcat_0_dout 1 9 1 NJ 380
+preplace netloc vio_0_probe_out0 1 2 9 600 710 NJ 710 1220J 500 1520J 540 1880J 520 NJ 520 NJ 520 2900J 500 3360
+preplace netloc vio_ctrl_probe_out1 1 3 8 850 810 NJ 810 NJ 810 NJ 810 NJ 810 NJ 810 NJ 810 3370
+preplace netloc axi_dma_0_M_AXI_S2MM 1 8 1 2570 60n
+preplace netloc axi_interconnect_0_M00_AXI 1 9 1 2900 120n
+preplace netloc data_sel_0_m_axis 1 4 1 N 560
+preplace netloc demux1_2_0_m0_axis 1 5 1 1510 440n
+preplace netloc demux1_2_0_m1_axis 1 5 1 N 600
+preplace netloc mux2_1_0_m_axis 1 7 1 2230 390n
+preplace netloc pang_fifo_M_AXIS 1 6 1 1890 450n
+preplace netloc ping_fifo_M_AXIS 1 6 1 N 610
+preplace netloc processing_system7_0_DDR 1 10 1 NJ 300
+preplace netloc processing_system7_0_FIXED_IO 1 10 1 NJ 320
+preplace netloc processing_system7_0_M_AXI_GP0 1 6 5 1910 240 NJ 240 NJ 240 NJ 240 3370
+preplace netloc ps7_0_axi_periph_M00_AXI 1 7 1 N 370
+preplace netloc data_gen_0_m_axis 1 3 1 820 530n
+levelinfo -pg 1 -10 130 410 710 1020 1380 1690 2060 2400 2740 3130 3390
+pagesize -pg 1 -db -bbox -sgen -110 0 3500 960
 "
 }
 
   # Restore current instance
   current_bd_instance $oldCurInst
 
+  validate_bd_design
   save_bd_design
-common::send_gid_msg -ssname BD::TCL -id 2050 -severity "WARNING" "This Tcl script was generated from a block design that has not been validated. It is possible that design <$design_name> may result in errors during validation."
-
   close_bd_design $design_name 
 }
 # End of cr_bd_system()
@@ -1380,7 +1283,7 @@ set_property SYNTH_CHECKPOINT_MODE "Hierarchical" [get_files system.bd ]
 
 #call make_wrapper to create wrapper files
 if { [get_property IS_LOCKED [ get_files -norecurse system.bd] ] == 1  } {
-  import_files -fileset sources_1 [file normalize "${origin_dir}/../project/project.gen/sources_1/bd/system/hdl/system_wrapper.v" ]
+  import_files -fileset sources_1 [file normalize "${origin_dir}/../../../../daq/PL/project/project.gen/sources_1/bd/system/hdl/system_wrapper.v" ]
 } else {
   set wrapper_path [make_wrapper -fileset sources_1 -files [ get_files -norecurse system.bd] -top]
   add_files -norecurse -fileset sources_1 $wrapper_path
@@ -1413,7 +1316,6 @@ if { $obj != "" } {
 
 }
 set obj [get_runs synth_1]
-set_property -name "needs_refresh" -value "1" -objects $obj
 set_property -name "part" -value "$fpga_part" -objects $obj
 set_property -name "auto_incremental_checkpoint" -value "1" -objects $obj
 set_property -name "strategy" -value "Vivado Synthesis Defaults" -objects $obj
@@ -1637,7 +1539,6 @@ set_property -name "options.warn_on_violation" -value "1" -objects $obj
 
 }
 set obj [get_runs impl_1]
-set_property -name "needs_refresh" -value "1" -objects $obj
 set_property -name "part" -value "$fpga_part" -objects $obj
 set_property -name "strategy" -value "Vivado Implementation Defaults" -objects $obj
 set_property -name "steps.write_bitstream.args.readback_file" -value "0" -objects $obj
