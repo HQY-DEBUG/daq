@@ -1,0 +1,13 @@
+# vscode
+.vscode/
+.history/
+.vs/
+*.code-workspace
+
+# Xilinx
+.Xil/
+*.log
+*.str
+*.jou
+project/
+project*
