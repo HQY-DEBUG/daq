@@ -29,15 +29,9 @@
 #include <stdio.h>
 
 #include "xparameters.h"
-
 #include "netif/xadapter.h"
-
 #include "platform.h"
 #include "platform_config.h"
-#if defined (__arm__) || defined(__aarch64__)
-#include "xil_printf.h"
-#endif
-
 #include "lwip/tcp.h"
 #include "xil_cache.h"
 
@@ -74,12 +68,6 @@ print_ip_settings(ip_addr_t *ip, ip_addr_t *mask, ip_addr_t *gw)
 	print_ip("Gateway : ", gw);
 }
 
-#ifdef XPS_BOARD_ZCU102
-#ifdef XPAR_XIICPS_0_DEVICE_ID
-int IicPhyReset(void);
-#endif
-#endif
-
 int main()
 {
 	ip_addr_t ipaddr, netmask, gw;
@@ -89,14 +77,6 @@ int main()
 	{ 0x00, 0x0a, 0x35, 0x00, 0x01, 0x02 };
 
 	echo_netif = &server_netif;
-
-/* Define this board specific macro in order perform PHY reset on ZCU102 */
-#ifdef XPS_BOARD_ZCU102
-	if(IicPhyReset()) {
-		xil_printf("Error performing PHY reset \n\r");
-		return -1;
-	}
-#endif
 
 	init_platform();
 
