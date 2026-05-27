@@ -41,11 +41,7 @@ int transfer_data() {
 
 void print_app_header()
 {
-#if (LWIP_IPV6==0)
 	xil_printf("\n\r\n\r-----lwIP TCP echo server ------\n\r");
-#else
-	xil_printf("\n\r\n\r-----lwIPv6 TCP echo server ------\n\r");
-#endif
 	xil_printf("TCP packets sent to port 6001 will be echoed back\n\r");
 }
 
