@@ -17,6 +17,9 @@ vitis/*
 !vitis/daq/
 vitis/daq/*
 !vitis/daq/src/
+vitis/daq/src/Xilinx.spec
+vitis/daq/src/README.txt
+vitis/daq/src/lscript.ld
 
 # Other
 ~*
