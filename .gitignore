@@ -12,10 +12,11 @@
 project/
 project*
 
-# Vitis
-vitis/.metadata
-vitis/.*
-vitis/RemoteSystemsTempFiles
+# Vitis：忽略 IDE 产生的所有内容，仅保留 daq/src/ 源码
+vitis/*
+!vitis/daq/
+vitis/daq/*
+!vitis/daq/src/
 
 # Other
 ~*
