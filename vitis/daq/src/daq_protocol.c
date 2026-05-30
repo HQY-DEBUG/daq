@@ -18,11 +18,21 @@
 static u8 g_rx_cache[DAQ_PROTOCOL_RX_CACHE_SIZE];
 static u32 g_rx_cache_len;
 
+/**
+ * @brief  按小端格式读取 32 位无符号整数
+ * @param  buf 输入字节缓冲区
+ * @return 读取到的 32 位无符号整数
+ */
 static u32 daq_protocol_read_u32_le(const u8 *buf)
 {
     return ((u32)buf[0]) | ((u32)buf[1] << 8) | ((u32)buf[2] << 16) | ((u32)buf[3] << 24);
 }
 
+/**
+ * @brief  按小端格式写入 32 位无符号整数
+ * @param  buf 输出字节缓冲区
+ * @param  value 待写入的 32 位无符号整数
+ */
 static void daq_protocol_write_u32_le(u8 *buf, u32 value)
 {
     buf[0] = (u8)(value & 0xFFU);
@@ -31,6 +41,10 @@ static void daq_protocol_write_u32_le(u8 *buf, u32 value)
     buf[3] = (u8)((value >> 24) & 0xFFU);
 }
 
+/**
+ * @brief  从协议接收缓存头部丢弃指定字节数
+ * @param  drop_len 需要丢弃的字节数
+ */
 static void daq_protocol_drop_bytes(u32 drop_len)
 {
     if (drop_len >= g_rx_cache_len) {
@@ -42,11 +56,23 @@ static void daq_protocol_drop_bytes(u32 drop_len)
     g_rx_cache_len -= drop_len;
 }
 
+/**
+ * @brief  初始化协议解析缓存
+ */
 void daq_protocol_init(void)
 {
     g_rx_cache_len = 0U;
 }
 
+/**
+ * @brief  输入 TCP 字节流并解析完整协议帧
+ * @param  data 输入字节流
+ * @param  len 输入字节数
+ * @param  handler 完整协议帧回调函数
+ * @param  context 回调上下文指针
+ * @return 0 表示成功，负数表示输入参数或缓存状态错误
+ * @note   支持 TCP 半包和粘包，会在缓存中等待完整协议帧
+ */
 int daq_protocol_input(const u8 *data, u32 len, daq_protocol_handler_t handler, void *context)
 {
     u32 offset;
@@ -111,6 +137,12 @@ int daq_protocol_input(const u8 *data, u32 len, daq_protocol_handler_t handler, 
     return 0;
 }
 
+/**
+ * @brief  从协议帧数据区读取 32 位参数
+ * @param  frame 协议帧
+ * @param  value 输出参数值
+ * @return 0 表示成功，负数表示协议帧无效
+ */
 int daq_protocol_get_u32_payload(const daq_protocol_frame_t *frame, u32 *value)
 {
     if ((frame == NULL) || (value == NULL) || (frame->payload == NULL)) {
@@ -125,6 +157,15 @@ int daq_protocol_get_u32_payload(const daq_protocol_frame_t *frame, u32 *value)
     return 0;
 }
 
+/**
+ * @brief  构建带 32 位数据区的应答帧
+ * @param  data_type 协议数据类型
+ * @param  value 应答数据区数值
+ * @param  out_buf 输出缓冲区
+ * @param  out_size 输出缓冲区大小
+ * @param  out_len 输出帧长度
+ * @return 0 表示成功，负数表示参数或缓冲区大小错误
+ */
 int daq_protocol_build_u32_response(u32 data_type, u32 value, u8 *out_buf, u32 out_size, u32 *out_len)
 {
     if ((out_buf == NULL) || (out_len == NULL)) {
@@ -145,6 +186,16 @@ int daq_protocol_build_u32_response(u32 data_type, u32 value, u8 *out_buf, u32 o
     return 0;
 }
 
+/**
+ * @brief  构建数据上传协议帧
+ * @param  packet_index 数据包序号
+ * @param  data 采集数据缓冲区
+ * @param  data_len 采集数据长度
+ * @param  out_buf 输出协议帧缓冲区
+ * @param  out_size 输出缓冲区大小
+ * @param  out_len 输出协议帧长度
+ * @return 0 表示成功，负数表示参数或缓冲区大小错误
+ */
 int daq_protocol_build_data_frame(u32 packet_index, const u8 *data, u32 data_len, u8 *out_buf, u32 out_size, u32 *out_len)
 {
     u32 payload_len;

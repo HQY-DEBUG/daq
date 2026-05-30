@@ -25,6 +25,11 @@ static XAxiDma g_axi_dma;
 static u8 g_dma_rx_buffer[DAQ_DMA_RX_BUFFER_SIZE] __attribute__ ((aligned(64)));
 static int g_dma_rx_busy;
 
+/**
+ * @brief  初始化 AXI DMA 接收通道
+ * @return 0 表示成功，负数表示初始化失败
+ * @note   当前仅支持 AXI DMA 简单模式，不支持 Scatter-Gather 模式
+ */
 int dma_rx_init(void)
 {
     int status;
@@ -54,6 +59,11 @@ int dma_rx_init(void)
     return 0;
 }
 
+/**
+ * @brief  启动一次 DMA S2MM 接收
+ * @return 0 表示成功，负数表示启动失败
+ * @note   接收长度由 DAQ_DMA_RX_BUFFER_SIZE 决定
+ */
 int dma_rx_start(void)
 {
     int status;
@@ -73,6 +83,10 @@ int dma_rx_start(void)
     return 0;
 }
 
+/**
+ * @brief  查询 DMA 接收是否完成
+ * @return 1 表示完成，0 表示未完成
+ */
 int dma_rx_is_done(void)
 {
     if (g_dma_rx_busy == 0) {
@@ -87,6 +101,10 @@ int dma_rx_is_done(void)
     return 1;
 }
 
+/**
+ * @brief  中止当前 DMA 接收并复位 DMA
+ * @note   用于停止采集或 TCP 断开连接时清理 DMA 状态
+ */
 void dma_rx_abort(void)
 {
     int timeout;
@@ -108,16 +126,28 @@ void dma_rx_abort(void)
     g_dma_rx_busy = 0;
 }
 
+/**
+ * @brief  获取 DMA 接收缓冲区地址
+ * @return DMA 接收缓冲区指针
+ */
 u8 *dma_rx_get_buffer(void)
 {
     return g_dma_rx_buffer;
 }
 
+/**
+ * @brief  获取 DMA 接收数据长度
+ * @return DMA 接收缓冲区大小，单位 Byte
+ */
 u32 dma_rx_get_length(void)
 {
     return DAQ_DMA_RX_BUFFER_SIZE;
 }
 
+/**
+ * @brief  使 DMA 接收缓冲区 Cache 失效
+ * @note   DMA 接收完成后调用，保证 PS 读取到 DDR 中的最新数据
+ */
 void dma_rx_invalidate_cache(void)
 {
     Xil_DCacheInvalidateRange((UINTPTR)g_dma_rx_buffer, DAQ_DMA_RX_BUFFER_SIZE);

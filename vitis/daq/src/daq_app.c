@@ -30,6 +30,12 @@ static u32 g_packet_index;
 static u8 g_tx_frame[DAQ_PROTOCOL_MAX_FRAME_SIZE];
 static u32 g_tx_frame_len;
 
+/**
+ * @brief  发送带 32 位数据区的协议应答
+ * @param  data_type 协议数据类型
+ * @param  value 应答数据区数值
+ * @return 0 表示成功，负数表示组包或发送失败
+ */
 static int daq_app_send_u32_response(u32 data_type, u32 value)
 {
     int ret;
@@ -51,6 +57,10 @@ static int daq_app_send_u32_response(u32 data_type, u32 value)
     return 0;
 }
 
+/**
+ * @brief  处理系统复位命令
+ * @note   当前复位命令清除采集状态并复位 DMA 接收状态
+ */
 static void daq_app_handle_reset_command(void)
 {
     g_is_collecting = 0;
@@ -60,6 +70,10 @@ static void daq_app_handle_reset_command(void)
     (void)daq_app_send_u32_response(DAQ_PROTOCOL_TYPE_RESET, DAQ_STATUS_OK);
 }
 
+/**
+ * @brief  处理开始采集和停止采集命令
+ * @param  frame 控制命令协议帧
+ */
 static void daq_app_handle_control_command(const daq_protocol_frame_t *frame)
 {
     int ret;
@@ -92,6 +106,10 @@ static void daq_app_handle_control_command(const daq_protocol_frame_t *frame)
     (void)daq_app_send_u32_response(DAQ_PROTOCOL_TYPE_CONTROL, DAQ_STATUS_ERROR);
 }
 
+/**
+ * @brief  处理 PC 返回的数据上传应答
+ * @param  frame 数据上传应答协议帧
+ */
 static void daq_app_handle_data_ack(const daq_protocol_frame_t *frame)
 {
     int ret;
@@ -112,6 +130,11 @@ static void daq_app_handle_data_ack(const daq_protocol_frame_t *frame)
     xil_printf("unexpected data ack=%d, current=%d, state=%d\r\n", (int)ack_index, (int)g_packet_index, g_daq_state);
 }
 
+/**
+ * @brief  协议解析完成后的分发回调
+ * @param  frame 已解析的协议帧
+ * @param  context 回调上下文指针
+ */
 static void daq_app_protocol_handler(const daq_protocol_frame_t *frame, void *context)
 {
     (void)context;
@@ -134,6 +157,10 @@ static void daq_app_protocol_handler(const daq_protocol_frame_t *frame, void *co
     xil_printf("unknown protocol type=0x%08lx\r\n", frame->data_type);
 }
 
+/**
+ * @brief  初始化数采应用状态机和 DMA 接收模块
+ * @return 0 表示成功，负数表示初始化失败
+ */
 int daq_app_init(void)
 {
     int ret;
@@ -153,6 +180,11 @@ int daq_app_init(void)
     return 0;
 }
 
+/**
+ * @brief  执行一次数采应用状态机调度
+ * @return 0 表示成功，负数表示 DMA 接收或 TCP 发送失败
+ * @note   主循环周期调用，负责 DMA 接收完成后组包并等待 PC 应答
+ */
 int daq_app_process(void)
 {
     int ret;
@@ -203,11 +235,18 @@ int daq_app_process(void)
     return 0;
 }
 
+/**
+ * @brief  处理 TCP 客户端连接事件
+ */
 void daq_app_on_tcp_connected(void)
 {
     g_daq_state = DAQ_APP_STATE_IDLE;
 }
 
+/**
+ * @brief  处理 TCP 客户端断开事件
+ * @note   断开后停止采集并中止 DMA 接收
+ */
 void daq_app_on_tcp_disconnected(void)
 {
     g_is_collecting = 0;
@@ -215,6 +254,11 @@ void daq_app_on_tcp_disconnected(void)
     dma_rx_abort();
 }
 
+/**
+ * @brief  处理 TCP 接收到的原始字节流
+ * @param  data TCP 接收数据
+ * @param  len TCP 接收数据长度
+ */
 void daq_app_on_tcp_rx(const u8 *data, u32 len)
 {
     int ret;

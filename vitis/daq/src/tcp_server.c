@@ -38,12 +38,23 @@
 
 static struct tcp_pcb *g_client_pcb;
 
+/**
+ * @brief  打印 TCP 服务启动信息
+ */
 void tcp_server_print_header(void)
 {
     xil_printf("\n\r\n\r-----DAQ TCP server ------\n\r");
     xil_printf("DAQ control and data port: %d\n\r", DAQ_TCP_PORT);
 }
 
+/**
+ * @brief  TCP 接收回调函数
+ * @param  arg lwIP 回调参数
+ * @param  tpcb 当前 TCP 控制块
+ * @param  p 接收数据缓冲链表，NULL 表示连接关闭
+ * @param  err lwIP 错误码
+ * @return lwIP 回调处理结果
+ */
 static err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
     struct pbuf *q;
@@ -71,6 +82,13 @@ static err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
     return ERR_OK;
 }
 
+/**
+ * @brief  TCP 连接接入回调函数
+ * @param  arg lwIP 回调参数
+ * @param  newpcb 新连接 TCP 控制块
+ * @param  err lwIP 错误码
+ * @return lwIP 回调处理结果
+ */
 static err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
     static int connection = 1;
@@ -93,6 +111,10 @@ static err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
     return ERR_OK;
 }
 
+/**
+ * @brief  启动 TCP 服务监听
+ * @return 0 表示成功，负数表示 TCP PCB 创建、绑定或监听失败
+ */
 int tcp_server_start(void)
 {
     struct tcp_pcb *pcb;
@@ -126,6 +148,12 @@ int tcp_server_start(void)
     return 0;
 }
 
+/**
+ * @brief  通过当前 TCP 连接发送数据
+ * @param  data 待发送数据缓冲区
+ * @param  len 待发送数据长度
+ * @return 0 表示成功，-2 表示发送缓存不足，其他负数表示发送失败
+ */
 int tcp_server_send(const u8 *data, u32 len)
 {
     err_t err;
@@ -157,6 +185,10 @@ int tcp_server_send(const u8 *data, u32 len)
     return 0;
 }
 
+/**
+ * @brief  查询当前是否已有 TCP 客户端连接
+ * @return 非 0 表示已有连接，0 表示无连接
+ */
 int tcp_server_has_client(void)
 {
     return g_client_pcb != NULL;
