@@ -20,7 +20,7 @@
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
  * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDI1024NG NEGLIGENCE OR OTHERWISE) ARISING
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
@@ -32,13 +32,10 @@
 #include "netif/xadapter.h"
 #include "platform.h"
 #include "platform_config.h"
+#include "tcp_server.h"
 #include "lwip/tcp.h"
 #include "xil_cache.h"
 
-/* defined by each RAW mode application */
-void print_app_header();
-int start_application();
-int transfer_data();
 void tcp_fasttmr(void);
 void tcp_slowtmr(void);
 
@@ -79,7 +76,7 @@ int main()
 	IP4_ADDR(&netmask, 255, 255, 255,  0);
 	IP4_ADDR(&gw,      192, 168,   1,  1);
 
-	print_app_header();
+	tcp_server_print_header();
 
 	lwip_init();
 
@@ -98,8 +95,8 @@ int main()
 
 	print_ip_settings(&ipaddr, &netmask, &gw);
 
-	/* start the application (web server, rxtest, txtest, etc..) */
-	start_application();
+	/* start the TCP server */
+	tcp_server_start();
 
 	/* receive and process packets */
 	while (1) {
@@ -112,7 +109,7 @@ int main()
 			TcpSlowTmrFlag = 0;
 		}
 		xemacif_input(echo_netif);
-		transfer_data();
+		tcp_server_transfer_data();
 	}
 
 	/* never reached */
