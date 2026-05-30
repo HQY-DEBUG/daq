@@ -13,8 +13,11 @@
 #ifndef TCP_SERVER_H_
 #define TCP_SERVER_H_
 
+#include "xil_types.h"
+
 void tcp_server_print_header(void);
 int tcp_server_start(void);
-int tcp_server_transfer_data(void);
+int tcp_server_send(const u8 *data, u32 len);
+int tcp_server_has_client(void);
 
 #endif

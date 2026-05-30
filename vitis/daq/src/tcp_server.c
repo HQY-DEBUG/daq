@@ -29,41 +29,41 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "daq_app.h"
+#include "daq_config.h"
 #include "lwip/err.h"
 #include "lwip/tcp.h"
 #include "tcp_server.h"
-#if defined (__arm__) || defined (__aarch64__)
 #include "xil_printf.h"
-#endif
 
-int tcp_server_transfer_data(void)
-{
-    return 0;
-}
+static struct tcp_pcb *g_client_pcb;
 
 void tcp_server_print_header(void)
 {
-    xil_printf("\n\r\n\r-----lwIP TCP server ------\n\r");
-    xil_printf("TCP packets sent to port 7 will be echoed back\n\r");
+    xil_printf("\n\r\n\r-----DAQ TCP server ------\n\r");
+    xil_printf("DAQ control and data port: %d\n\r", DAQ_TCP_PORT);
 }
 
 static err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
-    // 连接关闭时释放接收回调
+    struct pbuf *q;
+
+    (void)arg;
+    (void)err;
+
     if (!p) {
+        if (g_client_pcb == tpcb) {
+            g_client_pcb = NULL;
+            daq_app_on_tcp_disconnected();
+        }
         tcp_close(tpcb);
         tcp_recv(tpcb, NULL);
         return ERR_OK;
     }
 
-    // 通知 lwIP 当前数据已经处理
-    tcp_recved(tpcb, p->len);
-
-    // 回显收到的 TCP payload
-    if (tcp_sndbuf(tpcb) > p->len) {
-        err = tcp_write(tpcb, p->payload, p->len, 1);
-    } else {
-        xil_printf("no space in tcp_sndbuf\n\r");
+    tcp_recved(tpcb, p->tot_len);
+    for (q = p; q != NULL; q = q->next) {
+        daq_app_on_tcp_rx((const u8 *)q->payload, q->len);
     }
 
     pbuf_free(p);
@@ -75,12 +75,20 @@ static err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
     static int connection = 1;
 
-    // 为新连接注册接收回调
-    tcp_recv(newpcb, recv_callback);
+    (void)arg;
+    (void)err;
 
-    // 使用连接序号作为回调参数
+    if (g_client_pcb != NULL) {
+        xil_printf("Only one TCP client is supported\r\n");
+        tcp_close(newpcb);
+        return ERR_OK;
+    }
+
+    g_client_pcb = newpcb;
+    tcp_recv(newpcb, recv_callback);
     tcp_arg(newpcb, (void *)(UINTPTR)connection);
     connection++;
+    daq_app_on_tcp_connected();
 
     return ERR_OK;
 }
@@ -89,7 +97,7 @@ int tcp_server_start(void)
 {
     struct tcp_pcb *pcb;
     err_t err;
-    unsigned port = 7;
+    unsigned port = DAQ_TCP_PORT;
 
     pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
     if (!pcb) {
@@ -116,4 +124,40 @@ int tcp_server_start(void)
     xil_printf("TCP server started @ port %d\n\r", port);
 
     return 0;
+}
+
+int tcp_server_send(const u8 *data, u32 len)
+{
+    err_t err;
+
+    if ((data == NULL) || (len == 0U)) {
+        return -1;
+    }
+
+    if (g_client_pcb == NULL) {
+        return -3;
+    }
+
+    if (tcp_sndbuf(g_client_pcb) < len) {
+        return -2;
+    }
+
+    err = tcp_write(g_client_pcb, data, len, TCP_WRITE_FLAG_COPY);
+    if (err != ERR_OK) {
+        xil_printf("tcp_write failed, err=%d\r\n", err);
+        return -4;
+    }
+
+    err = tcp_output(g_client_pcb);
+    if (err != ERR_OK) {
+        xil_printf("tcp_output failed, err=%d\r\n", err);
+        return -5;
+    }
+
+    return 0;
+}
+
+int tcp_server_has_client(void)
+{
+    return g_client_pcb != NULL;
 }

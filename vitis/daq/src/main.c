@@ -28,6 +28,7 @@
 
 #include <stdio.h>
 
+#include "daq_app.h"
 #include "xparameters.h"
 #include "netif/xadapter.h"
 #include "platform.h"
@@ -63,6 +64,7 @@ void print_ip_settings(ip_addr_t *ip, ip_addr_t *mask, ip_addr_t *gw)
 int main()
 {
 	ip_addr_t ipaddr, netmask, gw;
+	int app_ret;
 
 	/* the mac address of the board. this should be unique per board */
 	unsigned char mac_ethernet_address[] = { 0x00, 0x0a, 0x35, 0x00, 0x01, 0x02 };
@@ -95,8 +97,16 @@ int main()
 
 	print_ip_settings(&ipaddr, &netmask, &gw);
 
+	if (daq_app_init() != 0) {
+		xil_printf("DAQ application init failed\n\r");
+		return -2;
+	}
+
 	/* start the TCP server */
-	tcp_server_start();
+	if (tcp_server_start() != 0) {
+		xil_printf("TCP server start failed\n\r");
+		return -3;
+	}
 
 	/* receive and process packets */
 	while (1) {
@@ -109,7 +119,10 @@ int main()
 			TcpSlowTmrFlag = 0;
 		}
 		xemacif_input(echo_netif);
-		tcp_server_transfer_data();
+		app_ret = daq_app_process();
+		if (app_ret != 0) {
+			xil_printf("DAQ application process failed, ret=%d\n\r", app_ret);
+		}
 	}
 
 	/* never reached */
